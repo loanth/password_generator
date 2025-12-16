@@ -79,22 +79,31 @@ def test_create_group(user):
         return None
 
 def test_add_member(groupe, admin_user):
-    print_header("TEST : Ajout d'un membre au groupe")
+    print_header("AJOUT D'UN MEMBRE AU GROUPE")
     if groupe.admin_id != admin_user.id:
         print("❌ Vous devez être l'admin du groupe pour ajouter des membres.")
         return
     
-    print(f"Ajout d'un membre au groupe '{groupe.nom}'")
-    user_id = input("ID de l'utilisateur à ajouter : ")
+    print(f"\nGroupe : {groupe.nom}")
+    print("Ajout d'un nouveau membre par son email")
+    email = input("\nEmail de l'utilisateur à ajouter : ").strip()
     
-    try:
-        user_id = int(user_id)
-        if groupe.add_member(user_id, admin_user.id):
-            print("\n✅ Membre ajouté avec succès !")
-        else:
-            print("\n❌ Impossible d'ajouter ce membre au groupe.")
-    except ValueError:
-        print("\n❌ ID invalide.")
+    if not email:
+        print("\n❌ L'email ne peut pas être vide")
+        return
+    
+    # Vérifier si l'email est valide
+    if not User._is_valid_email(email):
+        print("\n❌ Format d'email invalide")
+        return
+    
+    # Ajouter le membre en utilisant l'email
+    result = groupe.add_member_by_email(email, admin_user.id)
+    
+    if result['success']:
+        print(f"\n✅ {result['message']}")
+    else:
+        print(f"\n❌ {result['message']}")
 
 def test_view_passwords(user):
     print_header("MES MOTS DE PASSE")
