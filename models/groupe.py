@@ -94,6 +94,44 @@ class Groupe(Model):
         """Ancienne méthode, à éviter d'utiliser directement"""
         result = self.add_member_by_email(user_id, added_by)
         return result['success']
+        
+    def remove_member_by_email(self, email: str, removed_by: str) -> dict:
+        """
+        Supprime un membre du groupe en utilisant son email
+        Retourne un dictionnaire avec 'success' et 'message'
+        """
+        if self.admin_id != removed_by:
+            return {'success': False, 'message': "Seul l'administrateur peut retirer des membres"}
+            
+        # Récupérer l'utilisateur par son email
+        user = User.get_by_email(email)
+        if not user:
+            return {'success': False, 'message': f"Aucun utilisateur trouvé avec l'email {email}"}
+            
+        # Vérifier si l'utilisateur est bien l'admin
+        if user.id == self.admin_id:
+            return {'success': False, 'message': "Impossible de retirer l'administrateur du groupe"}
+            
+        # Vérifier si l'utilisateur est bien membre du groupe
+        existing_member = super().query_one(
+            'SELECT 1 FROM membre WHERE user_id = ? AND groupe_id = ?',
+            (user.id, self.id)
+        )
+        if not existing_member:
+            return {'success': False, 'message': "Cet utilisateur n'est pas membre du groupe"}
+            
+        # Supprimer l'utilisateur du groupe
+        try:
+            super().query_delete(
+                'DELETE FROM membre WHERE user_id = ? AND groupe_id = ?',
+                (user.id, self.id)
+            )
+            return {
+                'success': True,
+                'message': f"Utilisateur {email} retiré avec succès du groupe"
+            }
+        except Exception as e:
+            return {'success': False, 'message': f"Erreur lors du retrait du groupe : {str(e)}"}
     
     def remove_member(self, user_id: str, removed_by: str) -> bool:
         """Supprime un membre du groupe"""
@@ -146,7 +184,47 @@ class Groupe(Model):
             JOIN grp_pwd gp ON p.id = gp.password_id
             JOIN app_user u ON p.created_by = u.id
             WHERE gp.groupe_id = ?
+            ORDER BY p.created_at DESC
         ''', (self.id,))
+        
+        return [{
+            'id': row[0],
+            'intitule': row[1],
+            'valeur_chiffree': row[2],
+            'created_at': row[3],
+            'auteur_nom': row[4],
+            'auteur_prenom': row[5]
+        } for row in rows]
+        
+    def add_password_to_group(self, password_id: str, added_by: str) -> dict:
+        """
+        Ajoute un mot de passe au groupe
+        Retourne un dictionnaire avec 'success' et 'message'
+        """
+        # Vérifier que l'utilisateur est bien membre du groupe
+        is_member = any(m['id'] == added_by for m in self.get_members())
+        if not is_member:
+            return {'success': False, 'message': 'Vous devez être membre du groupe pour ajouter un mot de passe'}
+            
+        # Vérifier que le mot de passe n'est pas déjà dans le groupe
+        existing = super().query_one(
+            'SELECT 1 FROM grp_pwd WHERE groupe_id = ? AND password_id = ?',
+            (self.id, password_id)
+        )
+        if existing:
+            return {'success': False, 'message': 'Ce mot de passe est déjà dans le groupe'}
+            
+        try:
+            super().query_insert(
+                'INSERT INTO grp_pwd (groupe_id, password_id) VALUES (?, ?)',
+                (self.id, password_id)
+            )
+            return {
+                'success': True,
+                'message': 'Mot de passe ajouté au groupe avec succès'
+            }
+        except Exception as e:
+            return {'success': False, 'message': f'Erreur lors de l\'ajout du mot de passe au groupe: {str(e)}'}
         
         return [{
             'id': row[0], 

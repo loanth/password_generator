@@ -146,6 +146,17 @@ class Database:
                 )
             ''')
             
+            # Table de liaison utilisateur-mot de passe (many-to-many)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_pwd (
+                    user_id TEXT,
+                    password_id TEXT,
+                    PRIMARY KEY (user_id, password_id),
+                    FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+                    FOREIGN KEY (password_id) REFERENCES password(id) ON DELETE CASCADE
+                )
+            ''')
+            
             conn.commit()
     
     # Alias pour la rétrocompatibilité
@@ -186,3 +197,15 @@ class Model:
     def query_delete(cls, query: str, params: tuple = ()) -> None:
         """Exécute une requête DELETE"""
         cls._get_db().query_delete(query, params)
+        
+    @classmethod
+    def init_db(cls, app):
+        """Initialise la base de données avec l'application Flask"""
+        # Créer le répertoire de la base de données s'il n'existe pas
+        db_dir = os.path.dirname(os.path.abspath(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')))
+        os.makedirs(db_dir, exist_ok=True)
+        
+        # Créer les tables si elles n'existent pas
+        db._create_tables()
+        
+        return db
